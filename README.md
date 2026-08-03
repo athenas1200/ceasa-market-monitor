@@ -1,93 +1,55 @@
 # CEASA Market Monitor · Dashboard Hortifruti
 
-Dashboard no estilo **Global Market Monitor** para cotações da CEASA (Frutas + Hortaliças),
-com dados históricos raspados do [Agrolink](https://www.agrolink.com.br/cotacoes/ceasa/).
+Dashboard no estilo **Global Market Monitor** para cotações CEASA (Frutas + Hortaliças)
+**e Café**, com dados históricos raspados do [Agrolink](https://www.agrolink.com.br/cotacoes/ceasa/)
+e salvos diariamente no banco de dados da VPS (histórico acumulado a partir de hoje).
 
-> Publicado no GitHub Pages: **https://athenas1200.github.io/ceasa-market-monitor/**
+> Publicado: **https://athenas1200.github.io/ceasa-market-monitor/**
+> · dre_demo: **https://consultoriasoft.com.br/dre_demo/ceasa.html**
 
 ---
 
 ## O que o dashboard mostra
 
-- **Ticker tape** contínuo com os maiores movimentos do dia
+- **Ordem fixada**: Café → Mamão → Maracujá → Pimenta → resto (`PIN_ORDEM` no JS)
+- **Ticker tape** contínuo com os maiores movimentos
 - **Cards de destaque**: maior alta, maior baixa, mais caro, mais barato
-- **Seletor de data** — veja qualquer pregão (padrão: última data com cobertura completa)
-- **Filtros**: estado, categoria (Frutas/Hortaliças), busca e "só altas"
-- **Tabela ordenável** com 37 produtos (preço médio nacional, variação, mini sparkline da evolução)
-- **Detalhe por estado** ao clicar em um produto (CEASA, preço e variação por UF)
-- **Market breadth** (subiram / cairam / neutros + A/D ratio)
-- **Mapa regional clicável** por estado
-- **Gráfico de evolução** de preços por categoria
-- **Top 5 altas / Top 5 baixas** do dia
+- **Seletor de data** (padrão = últimos preços disponíveis)
+- **Filtros**: estado, categoria (Café/Frutas/Hortaliças), busca e "só altas"
+- **Tabela ordenável** com preço médio, variação e mini sparkline da evolução
+- **Detalhe por estado** ao clicar em um produto
+- **Market breadth**, **mapa regional**, **gráfico de evolução** por categoria e **top altas/baixas**
 
 ## Arquivos
 
 | Arquivo | Descrição |
 |---|---|
-| `index.html` | Dashboard (HTML/CSS/JS puro, sem dependências) |
-| `ceasa_dashboard.json` | **Dados reais processados** consumidos pelo dashboard |
-| `ceasa_todos.csv` | Registros brutos (11.226 cotações, 27 dias, 18 estados) |
-| `ceasa_YYYY-MM-DD.csv` | Somente a última data |
-| `scraper_ceasa_completo.py` | Scraper do Agrolink (gera tudo acima) |
-| `.github/workflows/scrape.yml` | Atualização automática diária |
+| `index.html` | Dashboard (HTML/CSS/JS puro) |
+| `ceasa_dashboard.json` | Dados processados consumidos pelo dashboard |
+| `scraper_ceasa_completo.py` | Scraper completo (histórico) |
+| `scraper_diario.py` | **Script diário da VPS** (banco + JSON) — em `/opt/` |
+| `cafe_templates.json` | Templates de preço do café (decodificação do sprite) |
+| `LINKS.md` | Links e instruções rápidas |
 
-## Como rodar o scraper
+## Fluxo diário (VPS)
+
+1. **Cron 05:30** → `bash /opt/rodar_ceasa.sh`
+2. `scraper_diario.py` raspa as cotações novas (CEASA + Café), grava em
+   **MySQL `agnaldon_nordeste.ceasa_cotacoes`** (INSERT IGNORE, sem duplicar)
+3. Regenera `ceasa_dashboard.json` a partir do banco (histórico acumulado)
+4. O dre_demo serve esse JSON automaticamente
+
+O **café** tem preço em imagem no Agrolink: o script decodifica o sprite com
+**tesseract** (fonte normal) e **template matching** (fonte 7-segmentos). Preços novos
+que não existam em `cafe_templates.json` são pulados até o template ser atualizado.
+
+## Como rodar localmente
 
 ```bash
 pip install requests beautifulsoup4 pandas
-python scraper_ceasa_completo.py          # frutas + hortaliças completas (~375 páginas, ~5 min)
-python scraper_ceasa_completo.py --max-paginas 3   # teste rápido
+python scraper_ceasa_completo.py        # histórico completo (~375 páginas)
+python -m http.server 8000              # preview (não abrir via file://)
 ```
-
-Saída:
-
-```
-ceasa_todos.csv        -> registros brutos
-ceasa_dashboard.json   -> dados do dashboard
-ceasa_2026-08-03.csv   -> última data
-```
-
-Para publicar as atualizações no GitHub Pages basta rodar de novo e commitar o
-`ceasa_dashboard.json` (ou deixar o workflow diário fazer isso).
-
-## Ver localmente
-
-Como o dashboard carrega o JSON via `fetch`, sirva a pasta por HTTP (não abra via `file://`):
-
-```bash
-python -m http.server 8000
-# http://localhost:8000
-```
-
-## Estrutura do JSON
-
-```jsonc
-{
-  "gerado_em": "2026-08-03T...",
-  "fonte": "Agrolink",
-  "ultima_data": "2026-08-03",
-  "data_referencia": "2026-07-31",   // última data com cobertura completa
-  "datas": ["2026-07-05", ...],
-  "cobertura": { "2026-07-31": 556 },
-  "series": [
-    { "produto": "Mamão Formosa", "unidade": "1Kg", "categoria": "Frutas",
-      "estado": "SP", "ceasa": "CEAGESP Ribeirão Preto(SP)",
-      "precos": [["2026-07-05", 3.5], ...] }
-  ],
-  "historico": { "Frutas": [["05/07", 5.9], ...], "Hortaliças": [...] },
-  "raw_count": 11226,
-  "n_produtos": 37,
-  "n_estados": 18
-}
-```
-
-## Notas sobre os dados
-
-- Fonte: [Agrolink — Cotações CEASA](https://www.agrolink.com.br/cotacoes/ceasa/)
-- 37 produtos de catálogo × 18 estados, ~27 pregões por série
-- CEASAs reportam em dias distintos — por isso as datas finais do mês podem ter
-  cobertura "parcial" (marcadas no seletor de data)
-- A variação compara o preço de cada produto/estado com a cota anterior disponível
 
 ## Licença
 
