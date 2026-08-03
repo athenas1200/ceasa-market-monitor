@@ -224,11 +224,23 @@
 
 <script>
 /* ====================== ESTADO ====================== */
+const PIN_ORDEM = [
+  { label: 'Café',   keys: ['café'] },
+  { label: 'Mamão',  keys: ['mamão'] },
+  { label: 'Maracujá', keys: ['maracujá'] },
+  { label: 'Pimenta', keys: ['pimenta'] },
+];
 let DATA = null;
 const state = { data:null, estado:'', categoria:'', busca:'', soAlta:false, sort:'variacao', dir:-1, open:null };
 const E = id => document.getElementById(id);
 const fmt = v => v==null?'—':'R$ '+v.toFixed(2).replace('.',',');
 const fmtPct = v => v==null?'—':(v>0?'+':'')+v.toFixed(2).replace('.',',')+'%';
+const pinRank = p => {
+  const name = (p.produto||'').toLowerCase();
+  for (let i = 0; i < PIN_ORDEM.length; i++)
+    if (PIN_ORDEM[i].keys.some(k => name.includes(k))) return i;
+  return 99;
+};
 
 /* ====================== CÁLCULOS ====================== */
 function viewAt(dateStr){
@@ -366,6 +378,8 @@ function buildTable(prods){
   if(state.soAlta) list=list.filter(p=>(p.variacao??0)>0);
   const dir=state.dir;
   list.sort((a,b)=>{
+    const ra=pinRank(a), rb=pinRank(b);
+    if(ra!==rb) return ra-rb;
     const va=a[state.sort], vb=b[state.sort];
     if(va==null) return 1; if(vb==null) return -1;
     if(typeof va==='string') return va.localeCompare(vb)*dir;
@@ -501,7 +515,7 @@ fetch('./ceasa_dashboard.json')
   .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
   .then(d=>{
     DATA=d;
-    state.data=d.data_referencia||d.ultima_data;
+    state.data=d.ultima_data||d.data_referencia;
     E('fcount').textContent=`${d.raw_count.toLocaleString('pt-BR')} cotações · ${d.n_produtos} produtos · ${d.n_estados} estados`;
     E('fgen').textContent=`gerado em ${new Date(d.gerado_em).toLocaleString('pt-BR')}`;
     buildControls();
