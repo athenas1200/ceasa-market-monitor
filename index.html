@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CEASA Market Monitor · Hortifruti Brasil</title>
+<style>
+  :root{
+    --bg:#0b0f17; --bg2:#101726; --panel:#131c2d; --panel2:#0e1524;
+    --line:#1e2a42; --line2:#2a3a5c;
+    --txt:#e6ecf5; --mut:#7c8aa8; --dim:#4a5875;
+    --up:#22c55e; --down:#ef4444; --flat:#9ca3af;
+    --fruit:#3b82f6; --veg:#2dd4bf; --gold:#f59e0b;
+    --mono:'Consolas','SF Mono','Menlo',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45}
+  ::selection{background:#3b82f633}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)}
+
+  /* ===== Ticker tape ===== */
+  .tape{position:sticky;top:0;z-index:50;background:#0a0e16;border-bottom:1px solid var(--line)}
+  .tape-inner{overflow:hidden;white-space:nowrap;padding:6px 0}
+  .tape-track{display:inline-block;white-space:nowrap;animation:scroll 90s linear infinite}
+  .tape:hover .tape-track{animation-play-state:paused}
+  @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .tick{display:inline-block;padding:0 14px;border-right:1px solid var(--line);font-size:12px}
+  .tick .n{font-family:var(--mono);font-weight:600}
+  .tick .p{margin-left:8px;font-family:var(--mono)}
+  .tick .d{margin-left:8px;color:var(--mut);font-size:11px}
+
+  /* ===== Header ===== */
+  header{padding:18px 22px 14px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--line)}
+  .brand h1{font-size:20px;font-weight:700;letter-spacing:.3px}
+  .brand h1 .hl{color:var(--gold)}
+  .brand .sub{color:var(--mut);font-size:12.5px;margin-top:3px}
+  .clockbox{text-align:right;font-size:12px;color:var(--mut)}
+  .clockbox .big{font-family:var(--mono);font-size:26px;color:var(--txt);font-weight:700;letter-spacing:1px}
+  .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--up);margin-right:6px;animation:blink 1.6s infinite}
+  @keyframes blink{50%{opacity:.25}}
+
+  /* ===== Stats row ===== */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:16px 22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+  .card .lbl{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.7px}
+  .card .val{font-size:21px;font-weight:700;margin-top:5px;font-family:var(--mono)}
+  .card .sub{font-size:11.5px;color:var(--mut);margin-top:3px}
+  .card.mini{padding:11px 14px}
+  .adbar{display:flex;height:8px;border-radius:6px;overflow:hidden;margin-top:8px}
+  .adbar .up{background:var(--up)} .adbar .down{background:var(--down)} .adbar .flat{background:var(--flat)}
+
+  /* ===== Controls ===== */
+  .controls{display:flex;flex-wrap:wrap;gap:10px;padding:4px 22px 14px;align-items:center}
+  .controls label{font-size:12px;color:var(--mut);margin-right:6px}
+  select,input[type=search]{background:var(--panel2);color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;font-size:13px;outline:none}
+  select:focus,input:focus{border-color:var(--gold)}
+  input[type=search]{width:200px}
+  .chip{background:var(--panel2);border:1px solid var(--line2);color:var(--mut);border-radius:999px;padding:7px 14px;font-size:12.5px;cursor:pointer;user-select:none;transition:.15s}
+  .chip.on{background:var(--gold);color:#0b0f17;border-color:var(--gold);font-weight:600}
+  .info{margin-left:auto;color:var(--dim);font-size:12px}
+  .info b{color:var(--mut)}
+
+  /* ===== Layout ===== */
+  main{display:grid;grid-template-columns:1.9fr 1fr;gap:16px;padding:0 22px 26px}
+  @media(max-width:1100px){main{grid-template-columns:1fr}}
+  .col{display:flex;flex-direction:column;gap:16px}
+
+  /* ===== Panels ===== */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .panel .ph{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .panel .ph h3{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);font-weight:600}
+  .panel .ph .hint{font-size:11.5px;color:var(--dim)}
+
+  /* ===== Table ===== */
+  .twrap{overflow:auto;max-height:640px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{position:sticky;top:0;background:#141d30;color:var(--mut);text-transform:uppercase;font-size:11px;letter-spacing:.6px;text-align:left;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
+  thead th:hover{color:var(--txt)}
+  thead th .arr{opacity:0;font-size:10px;margin-left:3px}
+  thead th.sorted .arr{opacity:1}
+  tbody td{padding:9px 12px;border-bottom:1px solid #17213a;vertical-align:middle}
+  tbody tr{transition:background .12s;cursor:pointer}
+  tbody tr:hover{background:#1a2740}
+  tbody tr.open{background:#1c2c4d}
+  .cat-badge{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:999px;font-weight:600}
+  .cat-frutas{background:#3b82f622;color:var(--fruit);border:1px solid #3b82f655}
+  .cat-hortaliças{background:#2dd4bf22;color:var(--veg);border:1px solid #2dd4bf55}
+  .var-tag{font-family:var(--mono);font-weight:600;padding:3px 8px;border-radius:6px;display:inline-block;min-width:72px;text-align:center}
+  .spark{width:96px;height:28px}
+  .detail-row>td{padding:0;border-bottom:none}
+  .detail-inner{padding:4px 16px 16px}
+  .detail-inner h4{font-size:12px;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+  .detail-inner table{font-size:12.5px}
+  .detail-inner td{padding:6px 10px}
+  .detail-inner thead th{position:static}
+  .empty{color:var(--dim);text-align:center;padding:40px}
+
+  /* ===== Breadth ===== */
+  .breadth{padding:16px}
+  .bnum{display:flex;gap:12px;margin-bottom:14px}
+  .bnum>div{flex:1;text-align:center;border:1px solid var(--line);border-radius:10px;padding:10px 6px}
+  .bnum .k{font-size:24px;font-weight:700;font-family:var(--mono)}
+  .bnum .t{font-size:11px;color:var(--mut);margin-top:2px}
+  .ar{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;color:var(--mut);margin-top:8px}
+
+  /* ===== Regional ===== */
+  .reg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;padding:16px}
+  .reg{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 9px;cursor:pointer;transition:.12s;text-align:center}
+  .reg:hover{border-color:var(--line2)}
+  .reg.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+  .reg .uf{font-size:13px;font-weight:700;letter-spacing:1px}
+  .reg .pr{font-family:var(--mono);font-size:12px;margin-top:2px}
+  .reg .vr{font-family:var(--mono);font-size:10.5px;margin-top:1px}
+
+  /* ===== Chart ===== */
+  .chartbox{padding:14px 16px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--mut);margin-bottom:10px}
+  .legend .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+  svg text{fill:var(--mut);font-size:10.5px;font-family:var(--mono)}
+
+  /* ===== Top lists ===== */
+  .tops{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:700px){.tops{grid-template-columns:1fr}}
+  .toplist{padding:8px 0}
+  .row-item{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #17213a}
+  .row-item:last-child{border-bottom:none}
+  .row-item .rk{width:22px;height:22px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--mono);color:var(--mut);flex:none}
+  .row-item .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row-item .nm small{display:block;color:var(--dim);font-size:11px}
+  .row-item .pp{font-family:var(--mono);font-size:13px;font-weight:600}
+
+  /* ===== Footer ===== */
+  footer{padding:18px 22px 26px;color:var(--dim);font-size:12px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+  footer a{color:var(--mut);text-decoration:none}
+  footer a:hover{color:var(--gold)}
+  .spacer{height:2px}
+
+  @media(max-width:640px){
+    .brand h1{font-size:17px}
+    .clockbox .big{font-size:20px}
+    .controls input[type=search]{width:100%}
+  }
+</style>
+</head>
+<body>
+
+<div class="tape"><div class="tape-inner" id="tickertape"></div></div>
+
+<header>
+  <div class="brand">
+    <h1>CEASA <span class="hl">Market Monitor</span></h1>
+    <div class="sub">Cotações CEASA · Frutas &amp; Hortaliças · Fonte <a href="https://www.agrolink.com.br/cotacoes/ceasa/" target="_blank" style="color:var(--mut)">Agrolink</a></div>
+  </div>
+  <div class="clockbox">
+    <div><span class="pulse"></span>BRT · Sessão aberta</div>
+    <div class="big" id="clock">--:--:--</div>
+    <div id="databadge" style="margin-top:4px"></div>
+  </div>
+</header>
+
+<section class="stats" id="stats"></section>
+
+<div class="controls" id="controls"></div>
+
+<main>
+  <div class="col">
+    <div class="panel">
+      <div class="ph"><h3>Produtos</h3><span class="hint" id="tablehint"></span></div>
+      <div class="twrap">
+        <table id="prodtbl">
+          <thead><tr id="thead"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h3>Evolução por categoria</h3><span class="hint">média nacional diária</span></div>
+      <div class="chartbox">
+        <div class="legend">
+          <span><span class="dot" style="background:var(--fruit)"></span>Frutas</span>
+          <span><span class="dot" style="background:var(--veg)"></span>Hortaliças</span>
+        </div>
+        <svg id="chart" viewBox="0 0 900 260" style="width:100%;height:auto"></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <div class="ph"><h3>Market Breadth</h3><span class="hint" id="breadthhint"></span></div>
+      <div class="breadth">
+        <div class="bnum">
+          <div><div class="k up" id="bsub">0</div><div class="t">Subiram</div></div>
+          <div><div class="k down" id="bdown">0</div><div class="t">Cairam</div></div>
+          <div><div class="k flat" id="bneut">0</div><div class="t">Neutros</div></div>
+        </div>
+        <div class="adbar"><div class="up" id="barbar"></div><div class="down" id="barbar2"></div><div class="flat" id="barbar3"></div></div>
+        <div class="ar"><span>Advance / Decline</span><b class="num" id="adr">-</b></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h3>Regional · clique para filtrar</h3><span class="hint" id="regionhint"></span></div>
+      <div class="reg-grid" id="reggrid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h3>Destaques do dia</h3></div>
+      <div class="tops">
+        <div><div class="ph" style="border:none;padding:8px 16px 4px"><h3 style="color:var(--up)">▲ Top altas</h3></div><div class="toplist" id="topup"></div></div>
+        <div><div class="ph" style="border:none;padding:8px 16px 4px"><h3 style="color:var(--down)">▼ Top baixas</h3></div><div class="toplist" id="topdown"></div></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Dados raspados do Agrolink · <span id="fcount"></span> · <span id="fgen"></span></span>
+  <span><a href="https://www.agrolink.com.br/cotacoes/ceasa/" target="_blank">Agrolink CEASA ↗</a> · <a href="https://github.com/" target="_blank">GitHub</a></span>
+</footer>
+
+<script>
+/* ====================== ESTADO ====================== */
+let DATA = null;
+const state = { data:null, estado:'', categoria:'', busca:'', soAlta:false, sort:'variacao', dir:-1, open:null };
+const E = id => document.getElementById(id);
+const fmt = v => v==null?'—':'R$ '+v.toFixed(2).replace('.',',');
+const fmtPct = v => v==null?'—':(v>0?'+':'')+v.toFixed(2).replace('.',',')+'%';
+
+/* ====================== CÁLCULOS ====================== */
+function viewAt(dateStr){
+  /* retorna {produto,unidade,categoria,estado,ceasa,data,preco,preco_anterior,variacao} para cada série */
+  const out=[];
+  for(const s of DATA.series){
+    const ps=s.precos;
+    if(!ps.length) continue;
+    let cur=null, prev=null;
+    for(let i=ps.length-1;i>=0;i--){
+      if(ps[i][0]<=dateStr){ cur=ps[i]; 
+        for(let j=i-1;j>=0;j--){ if(ps[j][0]<cur[0]){ prev=ps[j]; break; } }
+        break; }
+    }
+    if(!cur) continue;
+    out.push({produto:s.produto,unidade:s.unidade,categoria:s.categoria,estado:s.estado,
+      ceasa:s.ceasa,data:cur[0],preco:cur[1],
+      preco_anterior:prev?prev[1]:null,
+      variacao: prev? ((cur[1]-prev[1])/prev[1]*100):null});
+  }
+  return out;
+}
+function aggProdutos(dets){
+  const m={};
+  for(const d of dets){
+    const k=d.produto+'|'+d.unidade+'|'+d.categoria;
+    (m[k]=m[k]||[]).push(d);
+  }
+  const list=Object.values(m).map(items=>{
+    const precos=items.map(i=>i.preco);
+    const media=precos.reduce((a,b)=>a+b,0)/precos.length;
+    const ants=items.filter(i=>i.preco_anterior!=null).map(i=>i.preco_anterior);
+    let variacao=null;
+    if(ants.length){ const ma=ants.reduce((a,b)=>a+b,0)/ants.length; variacao=(media-ma)/ma*100; }
+    return {produto:items[0].produto,unidade:items[0].unidade,categoria:items[0].categoria,
+      preco:media,variacao, max:Math.max(...precos), min:Math.min(...precos),
+      estados:items.length, det:items};
+  });
+  return list;
+}
+function aggRegional(dets){
+  const m={};
+  for(const d of dets)(m[d.estado]=m[d.estado]||[]).push(d);
+  return Object.values(m).map(items=>{
+    const precos=items.map(i=>i.preco);
+    const media=precos.reduce((a,b)=>a+b,0)/precos.length;
+    const ants=items.filter(i=>i.preco_anterior!=null).map(i=>i.preco_anterior);
+    let variacao=null;
+    if(ants.length){ const ma=ants.reduce((a,b)=>a+b,0)/ants.length; variacao=(media-ma)/ma*100; }
+    return {estado:items[0].estado,preco:media,variacao,
+      count:items.length,
+      subiram:items.filter(i=>(i.variacao??0)>0).length,
+      cairam:items.filter(i=>(i.variacao??0)<0).length};
+  });
+}
+function dailyAvg(produto){
+  const map={};
+  for(const s of DATA.series){
+    if(s.produto!==produto) continue;
+    for(const [d,p] of s.precos)(map[d]=map[d]||[]).push(p);
+  }
+  return Object.entries(map).map(([d,vs])=>[d,vs.reduce((a,b)=>a+b,0)/vs.length]).sort((a,b)=>a[0]<b[0]?-1:1);
+}
+
+/* ====================== RENDER ====================== */
+function buildTicker(dets){
+  const items=dets.filter(d=>d.variacao!=null).sort((a,b)=>Math.abs(b.variacao)-Math.abs(a.variacao)).slice(0,40);
+  const html=items.map(d=>{
+    const cls=d.variacao>0?'up':(d.variacao<0?'down':'flat');
+    return `<span class="tick"><span class="n">${d.produto}</span> <span class="p ${cls}">${d.variacao>0?'▲':d.variacao<0?'▼':'◆'} ${fmtPct(d.variacao)}</span> <span class="d">${fmt(d.preco)} · ${d.estado}</span></span>`;
+  }).join('');
+  E('tickertape').innerHTML = `<div class="tape-track">${html}${html}</div>`;
+}
+function buildStats(prods, dets){
+  const up=prods.filter(p=>(p.variacao??0)>0);
+  const down=prods.filter(p=>(p.variacao??0)<0);
+  const topUp=up.sort((a,b)=>b.variacao-a.variacao)[0];
+  const topDown=down.sort((a,b)=>a.variacao-b.variacao)[0];
+  const caro=prods.reduce((a,b)=>b.preco>a.preco?b:a);
+  const barato=prods.reduce((a,b)=>b.preco<a.preco?b:a);
+  const subs=dets.filter(d=>(d.variacao??0)>0).length;
+  const falls=dets.filter(d=>(d.variacao??0)<0).length;
+  const neut=dets.filter(d=>d.variacao===0).length;
+  const total=subs+falls+neut||1;
+  const card=(lbl,val,sub,cls)=>`<div class="card"><div class="lbl">${lbl}</div><div class="val ${cls||''}">${val}</div><div class="sub">${sub||''}</div></div>`;
+  E('stats').innerHTML =
+    card('Breadth · Alta/Baixa', `<span class="up">${subs}</span> / <span class="down">${falls}</span>`, `${neut} neutros`, '')+
+    card('Maior Alta', fmtPct(topUp?.variacao), topUp?`${topUp.produto}`:'','up')+
+    card('Maior Baixa', fmtPct(topDown?.variacao), topDown?`${topDown.produto}`:'','down')+
+    card('Mais Caro', fmt(caro?.preco), caro?`${caro.produto}`:'','')+
+    card('Mais Barato', fmt(barato?.preco), barato?`${barato.produto}`:'','');
+  E('bsub').textContent=subs; E('bdown').textContent=falls; E('bneut').textContent=neut;
+  E('barbar').style.width=(subs/total*100)+'%';
+  E('barbar2').style.width=(falls/total*100)+'%';
+  E('barbar3').style.width=(neut/total*100)+'%';
+  E('adr').textContent=(subs/ (falls||1)).toFixed(2);
+  E('breadthhint').textContent = `${dets.length} cotações`;
+  E('tablehint').textContent = `${prods.length} produtos`;
+}
+function buildControls(){
+  const dates=[...DATA.datas].reverse();
+  const sel = `<label>Data</label><select id="seldata">${dates.map(d=>`<option value="${d}" ${d===state.data?'selected':''}>${fmtDate(d)}${DATA.cobertura[d]<50?' (parcial)':''}</option>`).join('')}</select>`;
+  const est = `<label>Estado</label><select id="selestado"><option value="">Todos</option>${[...new Set(DATA.series.map(s=>s.estado))].sort().map(e=>`<option value="${e}" ${e===state.estado?'selected':''}>${e}</option>`).join('')}</select>`;
+  const cat = `<label>Categoria</label><select id="selcat"><option value="">Todas</option><option value="Frutas">Frutas</option><option value="Hortaliças">Hortaliças</option></select>`;
+  const busca = `<input type="search" id="busca" placeholder="Buscar produto…" value="${state.busca}">`;
+  const chip = `<div class="chip ${state.soAlta?'on':''}" id="chipAlta">▲ Só altas</div>`;
+  E('controls').innerHTML = sel+est+cat+busca+chip+
+    `<div class="info">Última atualização: <b>${fmtDate(DATA.ultima_data)}</b> · referência ${fmtDate(DATA.data_referencia)}</div>`;
+  E('seldata').onchange=e=>{state.data=e.target.value;state.open=null;render();};
+  E('selestado').onchange=e=>{state.estado=e.target.value;state.open=null;render();};
+  E('selcat').value=state.categoria;
+  E('selcat').onchange=e=>{state.categoria=e.target.value;state.open=null;render();};
+  E('busca').oninput=e=>{state.busca=e.target.value.toLowerCase();render();};
+  E('chipAlta').onclick=()=>{state.soAlta=!state.soAlta;E('chipAlta').classList.toggle('on');render();};
+}
+function fmtDate(d){
+  const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`;
+}
+function buildTable(prods){
+  const cols=[
+    {k:'produto',l:'Produto',sort:true},
+    {k:'categoria',l:'Categoria',sort:true},
+    {k:'estados',l:'Estados',sort:true,cls:'num'},
+    {k:'preco',l:'Preço Médio',sort:true,cls:'num'},
+    {k:'variacao',l:'Variação',sort:true,cls:'num'},
+  ];
+  E('thead').innerHTML=cols.map(c=>`<th class="${state.sort===c.k?'sorted':''}" data-k="${c.k}">${c.l}<span class="arr">${state.sort===c.k?(state.dir<0?'↓':'↑'):''}</span></th>`).join('')+`<th>Evolução</th>`;
+  document.querySelectorAll('#thead th').forEach(th=>{
+    const k=th.dataset.k; if(!k)return;
+    th.onclick=()=>{ if(state.sort===k)state.dir*=-1; else{state.sort=k;state.dir=-1;} render(); };
+  });
+  let list=[...prods];
+  if(state.categoria) list=list.filter(p=>p.categoria===state.categoria);
+  if(state.busca) list=list.filter(p=>p.produto.toLowerCase().includes(state.busca)||p.unidade.toLowerCase().includes(state.busca));
+  if(state.soAlta) list=list.filter(p=>(p.variacao??0)>0);
+  const dir=state.dir;
+  list.sort((a,b)=>{
+    const va=a[state.sort], vb=b[state.sort];
+    if(va==null) return 1; if(vb==null) return -1;
+    if(typeof va==='string') return va.localeCompare(vb)*dir;
+    return (va-vb)*dir;
+  });
+  if(!list.length){ E('tbody').innerHTML=`<tr><td colspan="6"><div class="empty">Nenhum produto encontrado com os filtros atuais.</div></td></tr>`; return; }
+  E('tbody').innerHTML=list.map(p=>{
+    const cls=p.variacao>0?'up':(p.variacao<0?'down':'flat');
+    const badge=p.categoria==='Frutas'?'cat-frutas':'cat-hortaliças';
+    const spark=sparkSVG(dailyAvg(p.produto));
+    const open=state.open===p.produto?'open':'';
+    return `<tr class="${open}" onclick="toggleDetail('${esc(p.produto)}',this)">`+
+      `<td><b>${p.produto}</b> <span style="color:var(--dim);font-size:11px">${p.unidade}</span></td>`+
+      `<td><span class="cat-badge ${badge}">${p.categoria}</span></td>`+
+      `<td class="num">${p.estados}</td>`+
+      `<td class="num">${fmt(p.preco)}</td>`+
+      `<td class="num"><span class="var-tag ${cls}" style="background:${p.variacao>0?'#22c55e1a':p.variacao<0?'#ef44441a':'#9ca3af1a'}">${fmtPct(p.variacao)}</span></td>`+
+      `<td>${spark}</td></tr>`+
+      `<tr class="detail-row" style="display:none" id="det-${esc(p.produto)}"><td colspan="6"><div class="detail-inner" id="in-${esc(p.produto)}"></div></td></tr>`;
+  }).join('');
+}
+function sparkSVG(series){
+  if(series.length<2) return `<svg class="spark" viewBox="0 0 96 28"></svg>`;
+  const w=96,h=28,pad=2;
+  const vs=series.map(s=>s[1]);
+  const mn=Math.min(...vs), mx=Math.max(...vs);
+  const pts=series.map((s,i)=>`${pad+(i/(series.length-1))*(w-2*pad)},${h-pad-((s[1]-mn)/((mx-mn)||1))*(h-2*pad)}`).join(' ');
+  const col=(vs[vs.length-1]>=vs[0])?getComputedStyle(document.documentElement).getPropertyValue('--up'):getComputedStyle(document.documentElement).getPropertyValue('--down');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${col.trim()}" stroke-width="1.6"/></svg>`;
+}
+function toggleDetail(prod,row){
+  const tr=document.getElementById('det-'+prod);
+  const isOpen=tr.style.display!=='none';
+  if(state.open&&state.open!==prod){ const old=document.getElementById('det-'+esc(state.open)); if(old)old.style.display='none'; document.querySelectorAll('tbody tr.open').forEach(r=>r.classList.remove('open')); }
+  tr.style.display=isOpen?'none':'';
+  row.classList.toggle('open',!isOpen);
+  state.open=isOpen?null:prod;
+  if(!isOpen){
+    const prods=aggProdutos(viewAt(state.data));
+    const p=prods.find(x=>x.produto===prod);
+    const inner=document.getElementById('in-'+esc(prod));
+    if(p) inner.innerHTML=detailHTML(p.det);
+  }
+}
+function detailHTML(dets){
+  const rows=dets.sort((a,b)=>a.estado.localeCompare(b.estado)).map(d=>{
+    const cls=d.variacao>0?'up':(d.variacao<0?'down':'flat');
+    return `<tr><td><b>${d.estado}</b></td><td style="color:var(--mut)">${d.ceasa.replace('(',' ').replace(')','')}</td><td class="num">${fmt(d.preco)}</td><td class="num ${cls}">${fmtPct(d.variacao)}</td><td style="color:var(--dim)">${fmtDate(d.data)}</td></tr>`;
+  }).join('');
+  return `<h4>Preços por estado</h4><table><thead><tr><th>UF</th><th>CEASA</th><th>Preço</th><th>Variação</th><th>Data</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function buildRegional(regs){
+  const max=Math.max(...regs.map(r=>Math.abs(r.variacao??0)),0.001);
+  E('reggrid').innerHTML=regs.sort((a,b)=>a.estado.localeCompare(b.estado)).map(r=>{
+    const v=r.variacao;
+    const cls=v>0?'up':(v<0?'down':'flat');
+    const on=r.estado===state.estado?'on':'';
+    return `<div class="reg ${on}" data-uf="${r.estado}"><div class="uf">${r.estado}</div><div class="pr">${fmt(r.preco)}</div><div class="vr ${cls}">${fmtPct(v)}</div></div>`;
+  }).join('');
+  document.querySelectorAll('.reg').forEach(el=>{
+    el.onclick=()=>{
+      const uf=el.dataset.uf;
+      state.estado=(state.estado===uf)?'':uf;
+      state.open=null;
+      render();
+    };
+  });
+  E('regionhint').textContent=`${regs.length} estados`;
+}
+function buildTop(prods){
+  const withVar=prods.filter(p=>p.variacao!=null);
+  const up=withVar.filter(p=>p.variacao>0).sort((a,b)=>b.variacao-a.variacao).slice(0,5);
+  const down=withVar.filter(p=>p.variacao<0).sort((a,b)=>a.variacao-b.variacao).slice(0,5);
+  const item=(p,i,cls)=>`<div class="row-item"><div class="rk">${i+1}</div><div class="nm">${p.produto}<small>${p.categoria} · ${p.estados} estados</small></div><div class="pp ${cls}">${fmtPct(p.variacao)}</div><div class="pp num" style="width:64px;text-align:right;color:var(--mut)">${fmt(p.preco)}</div></div>`;
+  E('topup').innerHTML=up.length?up.map((p,i)=>item(p,i,'up')).join(''):`<div class="empty">Sem altas hoje</div>`;
+  E('topdown').innerHTML=down.length?down.map((p,i)=>item(p,i,'down')).join(''):`<div class="empty">Sem baixas hoje</div>`;
+}
+function buildChart(){
+  const hist=DATA.historico;
+  const cats=['Frutas','Hortaliças'];
+  const w=900,h=260,pl=46,pt=16,pr=14,pb=30;
+  const series=cats.map(c=>(hist[c]||[]).map(([l,v])=>v));
+  let mn=Infinity,mx=-Infinity;
+  series.forEach(s=>s.forEach(v=>{if(v<mn)mn=v;if(v>mx)mx=v;}));
+  const span=(mx-mn)||1;
+  const n=Math.max(...series.map(s=>s.length),2);
+  const X=i=>pl+(i/(n-1))*(w-pl-pr);
+  const Y=v=>pt+(h-pt-pb)-((v-mn)/span)*(h-pt-pb);
+  const labels=(hist['Frutas']||[]).map(e=>e[0]);
+  let grid='';
+  for(let g=0;g<=4;g++){
+    const val=mn+(span*g/4);
+    const y=Y(val);
+    grid+=`<line x1="${pl}" y1="${y}" x2="${w-pr}" y2="${y}" stroke="#1e2a42" stroke-width="1"/>`;
+    grid+=`<text x="${pl-6}" y="${y+3}" text-anchor="end">${val.toFixed(1)}</text>`;
+  }
+  const colors={Frutas:'var(--fruit)',Hortaliças:'var(--veg)'};
+  let lines='';
+  cats.forEach((c,ci)=>{
+    const pts=series[ci].map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+    lines+=`<polyline points="${pts}" fill="none" stroke="${colors[c]}" stroke-width="2.4"/>`;
+  });
+  let xlab='';
+  const step=Math.ceil(labels.length/8);
+  labels.forEach((l,i)=>{ if(i%step===0) xlab+=`<text x="${X(i)}" y="${h-8}" text-anchor="middle">${l}</text>`; });
+  E('chart').innerHTML=grid+lines+xlab;
+}
+function esc(s){ return s.replace(/['"]/g,''); }
+
+/* ====================== MAIN ====================== */
+function render(){
+  if(!DATA) return;
+  const dets=viewAt(state.data);
+  const prods=aggProdutos(dets).filter(p=>!state.estado||p.det.some(d=>d.estado===state.estado));
+  const regs=aggRegional(dets);
+  buildTicker(dets);
+  buildStats(prods,dets);
+  buildTable(prods);
+  buildRegional(regs);
+  buildTop(prods);
+  buildChart();
+  E('databadge').innerHTML=`<b>${fmtDate(state.data)}</b>`;
+}
+function clock(){
+  const now=new Date();
+  const brt=new Date(now.toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
+  const p=n=>String(n).padStart(2,'0');
+  E('clock').textContent=`${p(brt.getHours())}:${p(brt.getMinutes())}:${p(brt.getSeconds())}`;
+}
+setInterval(clock,1000); clock();
+
+fetch('./ceasa_dashboard.json')
+  .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(d=>{
+    DATA=d;
+    state.data=d.data_referencia||d.ultima_data;
+    E('fcount').textContent=`${d.raw_count.toLocaleString('pt-BR')} cotações · ${d.n_produtos} produtos · ${d.n_estados} estados`;
+    E('fgen').textContent=`gerado em ${new Date(d.gerado_em).toLocaleString('pt-BR')}`;
+    buildControls();
+    render();
+  })
+  .catch(e=>{
+    E('tbody').innerHTML=`<tr><td colspan="6"><div class="empty">Não foi possível carregar ceasa_dashboard.json (${e.message}).<br><br>Rode <b>python scraper_ceasa_completo.py</b> para gerar os dados reais ou sirva a pasta por HTTP (não abra via file://).</div></td></tr>`;
+  });
+</script>
+</body>
+</html>
